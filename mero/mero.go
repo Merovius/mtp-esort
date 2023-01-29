@@ -13,39 +13,59 @@ const (
 
 type Dir bool
 
-type Less[T any] func(l, r T) bool
+type Cmp[T any] func(l, r T) int
 
-type Chain[T any] []Less[T]
+type Chain[T any] []Cmp[T]
 
 func (c Chain[T]) Less(l, r T) bool {
 	for _, f := range c {
-		switch {
-		case f(l, r):
+		switch f(l, r) {
+		case -1:
 			return true
-		case f(r, l):
+		case 1:
 			return false
 		}
 	}
 	return false
 }
 
-func By[C any, F constraints.Ordered](by func(C) F, d Dir) Less[C] {
+func By[C any, F constraints.Ordered](by func(C) F, d Dir) Cmp[C] {
 	if d {
-		return func(l, r C) bool { return by(l) < by(r) }
+		return func(l, r C) int {
+			bl, br := by(l), by(r)
+			switch {
+			case bl < br:
+				return -1
+			case bl > br:
+				return 1
+			default:
+				return 0
+			}
+		}
 	}
-	return func(l, r C) bool { return by(r) < by(l) }
+	return func(l, r C) int {
+		bl, br := by(l), by(r)
+		switch {
+		case bl < br:
+			return 1
+		case bl > br:
+			return -1
+		default:
+			return 0
+		}
+	}
 }
 
-func ByFunc[C, F any](by func(C) F, less Less[F], d Dir) Less[C] {
+func ByFunc[C, F any](by func(C) F, cmp Cmp[F], d Dir) Cmp[C] {
 	if d {
-		return func(l, r C) bool { return less(by(l), by(r)) }
+		return func(l, r C) int { return cmp(by(l), by(r)) }
 	}
-	return func(l, r C) bool { return less(by(r), by(l)) }
+	return func(l, r C) int { return cmp(by(r), by(l)) }
 }
 
-func ByBytes[C any](by func(C) []byte, d Dir) Less[C] {
+func ByBytes[C any](by func(C) []byte, d Dir) Cmp[C] {
 	if d {
-		return func(l, r C) bool { return bytes.Compare(by(l), by(r)) < 0 }
+		return func(l, r C) int { return bytes.Compare(by(l), by(r)) }
 	}
-	return func(l, r C) bool { return bytes.Compare(by(r), by(l)) < 0 }
+	return func(l, r C) int { return bytes.Compare(by(r), by(l)) }
 }
