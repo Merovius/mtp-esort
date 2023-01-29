@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/matttproud/esort/mero"
 	"golang.org/x/exp/slices"
 )
 
@@ -396,6 +397,30 @@ func Benchmark(b *testing.B) {
 			sorter := New[Data]().
 				ByInt(func(d Data) int { return d.Int }, Desc).
 				ByUint(func(d Data) uint { return d.Uint }, Asc)
+			b.ResetTimer()
+			b.ReportAllocs()
+			for j := 0; j < b.N; j++ {
+				slices.SortFunc(bench[j], sorter.Less)
+			}
+		})
+	}
+}
+
+func BenchmarkMero(b *testing.B) {
+	for _, i := range []int{10, 100, 1000} {
+		b.Run(fmt.Sprint(i), func(b *testing.B) {
+			bench := make([][]Data, 0, b.N)
+			var data []Data
+			for j := 0; j < i; j++ {
+				data = append(data, benchData...)
+			}
+			for j := 0; j < b.N; j++ {
+				bench = append(bench, data)
+			}
+			sorter := mero.Chain[Data]{
+				mero.By(func(d Data) int { return d.Int }, mero.Desc),
+				mero.By(func(d Data) uint { return d.Uint }, mero.Asc),
+			}
 			b.ResetTimer()
 			b.ReportAllocs()
 			for j := 0; j < b.N; j++ {
